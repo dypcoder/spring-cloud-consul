@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2015 the original author or authors.
+ * Copyright 2013-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ import static org.springframework.cloud.consul.discovery.ConsulServerUtils.getMe
 /**
  * @author Spencer Gibb
  * @author Joe Athman
+ * @author Tim Ysewyn
  */
 public class ConsulDiscoveryClient implements DiscoveryClient {
 
@@ -55,12 +56,6 @@ public class ConsulDiscoveryClient implements DiscoveryClient {
 	public ConsulDiscoveryClient(ConsulClient client, ConsulDiscoveryProperties properties) {
 		this.client = client;
 		this.properties = properties;
-	}
-
-	@Deprecated
-	public ConsulDiscoveryClient(ConsulClient client, ConsulDiscoveryProperties properties,
-				LocalResolver localResolver) {
-		this(client, properties);
 	}
 
 	@Override
@@ -99,13 +94,13 @@ public class ConsulDiscoveryClient implements DiscoveryClient {
 		}
 		for (HealthService service : services.getValue()) {
 			String host = findHost(service);
-			
-			Map<String,String> metadata = getMetadata(service);
+
+			Map<String, String> metadata = getMetadata(service);
 			boolean secure = false;
-			if(metadata.containsKey("secure")) {
-			    secure = Boolean.parseBoolean(metadata.get("secure"));
+			if (metadata.containsKey("secure")) {
+				secure = Boolean.parseBoolean(metadata.get("secure"));
 			}
-			instances.add(new DefaultServiceInstance(serviceId, host, service
+			instances.add(new DefaultServiceInstance(service.getService().getId(), serviceId, host, service
 					.getService().getPort(), secure, metadata));
 		}
 	}
@@ -132,5 +127,10 @@ public class ConsulDiscoveryClient implements DiscoveryClient {
 			return new ArrayList<>(client.getCatalogServices(QueryParams.DEFAULT).getValue()
 					.keySet());
 		}
+	}
+
+	@Override
+	public int getOrder() {
+		return this.properties.getOrder();
 	}
 }

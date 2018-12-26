@@ -102,37 +102,6 @@ public class ConsulAutoRegistration extends ConsulRegistration {
 		}
 	}
 
-	@Deprecated //TODO: do I need this here, or should I just copy what I need back into lifecycle?
-	public static ConsulAutoRegistration lifecycleRegistration(Integer port, String instanceId, AutoServiceRegistrationProperties autoServiceRegistrationProperties,
-			ConsulDiscoveryProperties properties, ApplicationContext context,
-			List<ConsulRegistrationCustomizer> registrationCustomizers,
-			HeartbeatProperties heartbeatProperties) {
-		NewService service = new NewService();
-		String appName = getAppName(properties, context.getEnvironment());
-		service.setId(instanceId);
-		if(!properties.isPreferAgentAddress()) {
-			service.setAddress(properties.getHostname());
-		}
-		service.setName(normalizeForDns(appName));
-		service.setTags(createTags(properties));
-
-		// If an alternate external port is specified, register using it instead
-		if (properties.getPort() != null) {
-			service.setPort(properties.getPort());
-		} else {
-			service.setPort(port);
-		}
-
-		Assert.notNull(service.getPort(), "service.port may not be null");
-
-		setCheck(service, autoServiceRegistrationProperties, properties, context, heartbeatProperties);
-
-		ConsulAutoRegistration registration = new ConsulAutoRegistration(service, autoServiceRegistrationProperties,
-			properties, context, heartbeatProperties);
-		customize(registrationCustomizers, registration);
-		return registration;
-	}
-
 	public static void setCheck(NewService service,
 			AutoServiceRegistrationProperties autoServiceRegistrationProperties,
 			ConsulDiscoveryProperties properties, ApplicationContext context,
@@ -168,9 +137,8 @@ public class ConsulAutoRegistration extends ConsulRegistration {
 	public static String getInstanceId(ConsulDiscoveryProperties properties, ApplicationContext context) {
 		if (!StringUtils.hasText(properties.getInstanceId())) {
 			return normalizeForDns(IdUtils.getDefaultInstanceId(context.getEnvironment(), false));
-		} else {
-			return normalizeForDns(properties.getInstanceId());
 		}
+		return normalizeForDns(properties.getInstanceId());
 	}
 
 	public static String normalizeForDns(String s) {
@@ -206,10 +174,10 @@ public class ConsulAutoRegistration extends ConsulRegistration {
 		if (!StringUtils.isEmpty(properties.getInstanceGroup())) {
 			tags.add("group=" + properties.getInstanceGroup());
 		}
-        
+
 		//store the secure flag in the tags so that clients will be able to figure out whether to use http or https automatically
 		tags.add("secure=" + Boolean.toString(properties.getScheme().equalsIgnoreCase("https")));
-		
+
 		return tags;
 	}
 
@@ -231,6 +199,7 @@ public class ConsulAutoRegistration extends ConsulRegistration {
 					properties.getHostname(), port,
 					properties.getHealthCheckPath()));
 		}
+		check.setHeader(properties.getHealthCheckHeaders());
 		check.setInterval(properties.getHealthCheckInterval());
 		check.setTimeout(properties.getHealthCheckTimeout());
 		if (StringUtils.hasText(properties.getHealthCheckCriticalTimeout())) {
@@ -244,8 +213,8 @@ public class ConsulAutoRegistration extends ConsulRegistration {
 	 * @return the app name, currently the spring.application.name property
 	 */
 	public static String getAppName(ConsulDiscoveryProperties properties, Environment env) {
-		String appName = properties.getServiceName();
-		if (!StringUtils.isEmpty(appName)) {
+		final String appName = properties.getServiceName();
+		if (StringUtils.hasText(appName)) {
 			return appName;
 		}
 		return env.getProperty("spring.application.name", "application");
@@ -264,6 +233,10 @@ public class ConsulAutoRegistration extends ConsulRegistration {
 	 * @return the serviceId of the Management Service
 	 */
 	public static String getManagementServiceId(ConsulDiscoveryProperties properties, ApplicationContext context) {
+		final String instanceId = properties.getInstanceId();
+		if (StringUtils.hasText(instanceId)) {
+			return normalizeForDns(instanceId + SEPARATOR + properties.getManagementSuffix());
+		}
 		return normalizeForDns(IdUtils.getDefaultInstanceId(context.getEnvironment(), false)) + SEPARATOR + properties.getManagementSuffix();
 	}
 
@@ -271,6 +244,10 @@ public class ConsulAutoRegistration extends ConsulRegistration {
 	 * @return the service name of the Management Service
 	 */
 	public static String getManagementServiceName(ConsulDiscoveryProperties properties, Environment env) {
+		final String appName = properties.getServiceName();
+		if (StringUtils.hasText(appName)) {
+			return normalizeForDns(appName + SEPARATOR + properties.getManagementSuffix());
+		}
 		return normalizeForDns(getAppName(properties, env)) + SEPARATOR + properties.getManagementSuffix();
 	}
 
